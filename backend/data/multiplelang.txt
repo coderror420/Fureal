@@ -1,0 +1,35 @@
+Q: How can I reset my password?
+A: Click on 'Forgot Password' on the login page and follow the instructions.
+
+Q: What is your return policy?
+A: Returns are accepted within 7 days of delivery with original packaging.
+
+Q: How can I track my order?
+A: Use the 'Track Order' option and enter your order ID and email.
+
+Q: Can I cancel my order after placing it?
+A: Yes, you can cancel your order within 1 hour of placing it from your account page.
+
+Q: How do I contact customer care?
+A: You can reach us at support@example.com or use the chat option on our website.
+
+Q: What payment methods do you accept?
+A: We accept credit/debit cards, UPI, net banking, and wallets like Paytm and PhonePe.
+
+Q: मैं अपना पासवर्ड कैसे रीसेट करूं?
+A: लॉगिन पेज पर 'पासवर्ड भूल गए' पर क्लिक करें और निर्देशों का पालन करें।
+
+Q: आपकी रिटर्न पॉलिसी क्या है?
+A: डिलीवरी के 7 दिनों के भीतर ओरिजिनल पैकेजिंग के साथ रिटर्न स्वीकार किए जाते हैं।
+
+Q: मैं अपना ऑर्डर कैसे ट्रैक करूं?
+A: 'ऑर्डर ट्रैक करें' विकल्प का उपयोग करें और अपना ऑर्डर आईडी और ईमेल दर्ज करें।
+
+Q: क्या मैं अपना ऑर्डर कैंसिल कर सकता/सकती हूं?
+A: हां, ऑर्डर करने के एक घंटे के भीतर आप इसे अपने अकाउंट पेज से कैंसिल कर सकते हैं।
+
+Q: मैं कस्टमर केयर से कैसे संपर्क करूं?
+A: आप हमें support@example.com पर ईमेल कर सकते हैं या वेबसाइट के चैट विकल्प का उपयोग करें।
+
+Q: आप कौन-कौन से पेमेंट मोड स्वीकार करते हैं?
+A: हम डेबिट/क्रेडिट कार्ड, UPI, नेट बैंकिंग और पेटीएम, फोनपे जैसे वॉलेट स्वीकार करते हैं।

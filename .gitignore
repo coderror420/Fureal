@@ -1,0 +1,56 @@
+# === Node / React ===
+node_modules/
+dist/
+build/
+.env.local
+*.log
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.faiss
+*.db
+*.sqlite
+*.egg-info/
+*.so
+*.dylib
+
+# Python Virtual Environment
+venv/
+env/
+
+# === Vector Store and Embeddings ===
+
+audios/
+backend\__pycache__
+backend\.env
+# === Environment Files ===
+.env
+.env.*
+
+# === System Files ===
+.DS_Store
+Thumbs.db
+*.swp
+
+# === IDE / Editor Files ===
+.vscode/
+.idea/
+*.iml
+
+# === OS Specific ===
+*.bak
+*.tmp
+# Large vectorstore files
+backend/vectorstore
+
+
+# Python environment
+backend/venv/
+
+# Node modules
+frontend/node_modules/
+
+# Environment and logs
+*.log
+.env

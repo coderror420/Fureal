@@ -1,0 +1,34 @@
+[
+  {
+    "question": "What is this chatbot for?",
+    "answer": "This chatbot offers friendly, emotionally supportive conversations and can help answer questions about mental wellness, general insurance, and more."
+  },
+  {
+    "question": "Can I talk to the chatbot in Hindi?",
+    "answer": "Yes! The chatbot understands both English and Hindi, so feel free to chat in either language."
+  },
+  {
+    "question": "Does the chatbot give medical advice?",
+    "answer": "No, the chatbot is not a medical professional. It offers emotional support and helpful information, but it does not replace professional therapy or medical care."
+  },
+  {
+    "question": "Will my conversations be saved?",
+    "answer": "No, your conversations are not stored or linked to your identity. Your privacy is fully respected."
+  },
+  {
+    "question": "Can I hear the chatbot's replies?",
+    "answer": "Yes! The chatbot offers audio playback of responses. Just click the speaker icon next to any reply."
+  },
+  {
+    "question": "What if I feel really low or suicidal?",
+    "answer": "Please don’t hesitate to reach out to a trusted person or professional. In India, you can call iCall (+91-9152987821) or AASRA (+91-9820466726) for immediate help. You're not alone."
+  },
+  {
+    "question": "Can this chatbot help with insurance queries?",
+    "answer": "Yes, it can assist with general insurance-related questions and direct you to helpful resources."
+  },
+  {
+    "question": "How is this chatbot different from others?",
+    "answer": "It’s designed to be more emotionally intelligent and conversational — like chatting with a caring friend rather than a robot."
+  }
+]
