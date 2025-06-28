@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import ChatInput from "./chatinput";
-import MessageBubble from "./messagebubble";
+import ChatInput from "./ChatInput";
+import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 
 const ChatWindow = () => {
