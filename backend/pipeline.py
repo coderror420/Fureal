@@ -6,62 +6,110 @@ from dotenv import load_dotenv
 from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain_pinecone import PineconeVectorStore
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from transformers import pipeline
 from langdetect import detect, DetectorFactory
 from gtts import gTTS
+from langchain_core.runnables import Runnable
+from pinecone import Pinecone
 
+# Load environment variables
 load_dotenv()
 DetectorFactory.seed = 0
 
 # Constants
 DATA_FOLDER = "data"
-INDEX_FOLDER = "vectorstore"
 AUDIO_FOLDER = "audios"
+INDEX_NAME = "chatbot-index"
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
+# Pinecone client setup
+pc = Pinecone(api_key=PINECONE_API_KEY)
 user_profile = {"name": None}
 chat_history = []
 
-# Generate embeddings and FAISS index ONLY IF missing
-def generate_and_save_faiss_index(data_folder=DATA_FOLDER, index_folder=INDEX_FOLDER):
+# Check available indexes
+print("Available Pinecone indexes:", [idx.name for idx in pc.list_indexes()])
+
+# Create and upload Pinecone index
+def create_and_upload_pinecone_index():
     print("Loading documents for embedding generation...")
-    text_loader = TextLoader(os.path.join(data_folder, "multiplelang.txt"), encoding='utf-8')
-    csv_loader_1 = CSVLoader(os.path.join(data_folder, "Bitext_Sample_Customer_Support_Training_Dataset_27K_responses-v11.csv"), encoding='utf-8')
-    csv_loader_2 = CSVLoader(os.path.join(data_folder, "masterdata.csv"), encoding='utf-8')
-    json_loader = JSONLoader(os.path.join(data_folder, "intents.json"), jq_schema=".[]", text_content=False)
+
+    text_loader = TextLoader(os.path.join(DATA_FOLDER, "multiplelang.txt"), encoding='utf-8')
+    csv_loader_1 = CSVLoader(os.path.join(DATA_FOLDER, "Bitext_Sample_Customer_Support_Training_Dataset_27K_responses-v11.csv"), encoding='utf-8')
+    csv_loader_2 = CSVLoader(os.path.join(DATA_FOLDER, "masterdata.csv"), encoding='utf-8')
+    json_loader = JSONLoader(os.path.join(DATA_FOLDER, "intents.json"), jq_schema=".[]", text_content=False)
 
     docs = text_loader.load() + csv_loader_1.load() + csv_loader_2.load() + json_loader.load()
-    print(f"Loaded {len(docs)} documents")
+    print(f"Loaded {len(docs)} raw documents")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     split_docs = text_splitter.split_documents(docs)
-    print(f"Split into {len(split_docs)} document chunks")
+    print(f"Split into {len(split_docs)} chunks")
 
+    # Generate embeddings
     embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    print("Generating embeddings and building FAISS index...")
-    vectorstore = FAISS.from_documents(documents=split_docs, embedding=embedding_model)
+    sample_embedding = embedding_model.embed_documents([split_docs[0].page_content])
+    print("Sample embedding vector (first 5 dims):", sample_embedding[0][:5])
 
-    os.makedirs(index_folder, exist_ok=True)
-    vectorstore.save_local(index_folder)
-    print("FAISS index saved locally.")
+    # Upload to Pinecone
+    print("Uploading vectors to Pinecone...")
+    vectorstore = PineconeVectorStore.from_documents(
+        documents=split_docs,
+        embedding=embedding_model,
+        index_name=INDEX_NAME,
+        namespace="default"
+    )
+
+    print("Vector upload completed.")
+    return vectorstore, embedding_model
+
+# Load existing or create new Pinecone index
+def load_or_create_pinecone_index():
+    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    try:
+        index_names = [idx.name for idx in pc.list_indexes()]
+        if INDEX_NAME not in index_names:
+            print("Index not found, creating a new one.")
+            raise ValueError("Index not found")
+
+        # Check if the existing index is empty
+        index = pc.Index(INDEX_NAME)
+        stats = index.describe_index_stats()
+        vector_count = stats['total_vector_count']
+        print(f"Existing index vector count: {vector_count}")
+
+        if vector_count == 0:
+            print("Index exists but is empty. Uploading documents now.")
+            raise ValueError("Empty index")
+
+        vectorstore = PineconeVectorStore.from_existing_index(
+            index_name=INDEX_NAME,
+            embedding=embedding_model,
+            namespace="default"
+        )
+        print("Successfully loaded existing Pinecone index with vectors.")
+
+    except Exception as e:
+        print("Loading existing index failed or index was empty:", e)
+        vectorstore, embedding_model = create_and_upload_pinecone_index()
 
     return vectorstore, embedding_model
 
-def load_or_create_faiss_index(index_folder=INDEX_FOLDER, data_folder=DATA_FOLDER):
-    index_path = os.path.join(index_folder, "index.faiss")
-    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    if os.path.exists(index_path):
-        print("✅ FAISS index found locally, loading...")
-        vectorstore = FAISS.load_local(index_folder, embedding_model, allow_dangerous_deserialization=True)
-    else:
-        print("❌ FAISS index NOT found, generating embeddings and index now...")
-        vectorstore, embedding_model = generate_and_save_faiss_index(data_folder=data_folder, index_folder=index_folder)
+# Initialize retriever
+vectorstore, embedding_model = load_or_create_pinecone_index()
+retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
-    return vectorstore, embedding_model
+if isinstance(retriever, Runnable):
+    def get_relevant_docs(query):
+        return retriever.invoke(query)
+else:
+    def get_relevant_docs(query):
+        return retriever.get_relevant_documents(query)
 
 # Language detection
 def safe_lang_detect(text):
@@ -86,7 +134,7 @@ def detect_emotion(text: str) -> str:
         print("Emotion detection failed:", e)
         return "neutral"
 
-# Audio utils
+# Audio utilities
 def cleanup_old_audios(folder=AUDIO_FOLDER, max_age_minutes=30):
     current_time = time.time()
     if not os.path.exists(folder):
@@ -110,48 +158,40 @@ def generate_audio(text, lang="en", output_folder=AUDIO_FOLDER):
     tts.save(filepath)
     return filepath
 
-# Load or generate FAISS index once on start
-vectorstore, embedding_model = load_or_create_faiss_index()
-retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+# LLM setup
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
-# Prompt template
-base_prompt = """
+prompt_template = PromptTemplate(
+    input_variables=["question", "context"],
+    template="""
 You are an emotionally intelligent, warm, and supportive mental health companion.
-✨ Your job is to talk like a **caring, trusted friend** — not a robot, not an AI, and definitely not a therapist or a textbook.
+🌟 Your job is to talk like a **caring, trusted friend** — not a robot, not an AI, and definitely not a therapist or a textbook.
 🚫 NEVER say things like:
 - "Based on the text"
 - "The document states"
-- "You might be experiencing"
 - "According to the context"
-- "As an AI"
-- "The source says"
 ✅ INSTEAD:
 - Speak naturally, like a person who truly cares.
 - Use gentle, casual, and human-like language.
-- Show you understand the user’s feelings.
-- Give comforting, supportive replies — NOT medical definitions.
 💡 Your tone is cozy, friendly, and emotionally tuned in — like you’re chatting over coffee with someone who’s going through a tough time.
-🎯 Your goal is to make {name} feel heard, validated, and less alone.
+🌟 Your goal is to make the user feel heard, validated, and less alone.
 Relevant info you might want to keep in mind (if useful):  
 {context}
 Now respond to this message with kindness:
 User: {question}
 Assistant:
 """
-prompt_template = PromptTemplate(input_variables=["question", "context"], template=base_prompt)
+)
 
-# Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
-# Main chat response function
+# Main response function
 def generate_response(query: str):
     lang = safe_lang_detect(query)
 
-    # Suicide / crisis override response
     if any(phrase in query.lower() for phrase in ["suicidal", "kill myself", "want to die", "end my life", "hopeless"]):
         return {
             "text": (
-                "🥲 *Hey, I'm really sorry you're feeling this way. You're not alone.* "
+                "🩢 *Hey, I'm really sorry you're feeling this way. You're not alone.* "
                 "It takes courage to talk about it, and I'm here for you. Please try reaching out to someone you trust, "
                 "or connect with a mental health professional.\n\n"
                 "📞 *In India, you can contact iCall (+91-9152987821) or AASRA (+91-9820466726).* "
@@ -165,22 +205,18 @@ def generate_response(query: str):
             "text": "⚠️ Sorry, I can only chat in English or Hindi right now. Let's stick to those so I can help you best!"
         }
 
-    # Capture user name if unknown
-    if user_profile["name"] is None:
-        match = re.search(r"(?:i am|i'm|my name is|this is)\s+([A-Za-z]+)", query.lower())
-        if match:
-            user_profile["name"] = match.group(1).capitalize()
+    # if user_profile["name"] is None:
+    #     match = re.search(r"(?:i am|i'm|my name is|this is)\s+([A-Za-z]+)", query.lower())
+    #     if match:
+    #         user_profile["name"] = match.group(1).capitalize()
 
-    # Detect emotion heuristically
-    if any(w in query.lower() for w in ["want", "need", "get", "apply", "how to"]):
-        emotion = "neutral"
-    else:
-        emotion = detect_emotion(query)
+    emotion = "neutral" if any(w in query.lower() for w in ["want", "need", "get", "apply", "how to"]) else detect_emotion(query)
 
-    name = user_profile["name"] or "there"
+    # name = user_profile["name"] or "there"
 
     try:
-        relevant_docs = retriever.get_relevant_documents(query)
+        relevant_docs = get_relevant_docs(query)
+        
         context = "\n\n".join(doc.page_content for doc in relevant_docs) if relevant_docs else ""
 
         if context.strip():
@@ -192,13 +228,15 @@ def generate_response(query: str):
             )
             result = qa_chain.invoke({"question": query, "context": context, "chat_history": chat_history})
             response = result["answer"]
+            print("docs")
         else:
-            prompt_text = base_prompt.replace("{name}", name).replace("{context}", "").format(question=query)
-            response = llm.invoke(prompt_text)
+            # prompt_text = prompt_template.format(question=query, context="", name=name)
+            prompt_text = prompt_template.format(question=query, context="")
+            response = llm.invoke(prompt_text).content
 
         chat_history.append((query, response))
 
-        if any(phrase in response.lower() for phrase in ["major depressive disorder", "according to", "clinical depression"]):
+        if isinstance(response, str) and any(phrase in response.lower() for phrase in ["major depressive disorder", "according to", "clinical depression"]):
             response = "I just want you to know — you’re not alone in this. And no matter how heavy it feels, there *is* a way forward. I’m here for you. 💙"
 
     except Exception as e:
@@ -206,7 +244,7 @@ def generate_response(query: str):
         response = "😕 Hmm, something went wrong on my side. Want to try again?"
 
     fallback_phrases = ["i don't know", "i'm not sure", "not sure", "sorry, i don't know"]
-    if any(response.strip().lower().startswith(p) for p in fallback_phrases) or len(response.strip()) < 20:
+    if isinstance(response, str) and (any(response.strip().lower().startswith(p) for p in fallback_phrases) or len(response.strip()) < 20):
         response = "*Hmm... I'm not totally sure, but I'm still here to talk if you’d like!* 💬"
 
     emotion_prefix = {

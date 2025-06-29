@@ -1,5 +1,5 @@
 import ChatSidebar from "./ChatSidebar";
-import ChatWindow from "./ChatWindow";
+import ChatWindow from "./chatwindow";
 
 const ChatLayout = () => {
   return (
